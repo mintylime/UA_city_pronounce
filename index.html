@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Learn Ukrainian Cities</title>
+    
+    <!-- PWA / Mobile App Meta Tags -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="theme-color" content="#0057B7"> <!-- Ukrainian Blue -->
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin=""/>
+    
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+
+    <style>
+        /* Custom Styles for App-like feel */
+        body {
+            overscroll-behavior-y: none; /* Prevent pull-to-refresh on mobile */
+            -webkit-tap-highlight-color: transparent;
+        }
+        
+        #app-container {
+            height: 100vh;
+            height: 100dvh; /* Dynamic viewport height for mobile browsers */
+            display: flex;
+            flex-direction: column;
+        }
+
+        #map-container, #list-container {
+            flex: 1;
+            position: relative;
+            overflow: hidden;
+        }
+
+        #map {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 10;
+        }
+
+        #list-container {
+            overflow-y: auto;
+            background-color: #f3f4f6;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        /* Safe area padding for iPhones with notches */
+        .pb-safe { padding-bottom: env(safe-area-inset-bottom); }
+        .pt-safe { padding-top: env(safe-area-inset-top); }
+
+        /* Leaflet popup customization */
+        .leaflet-popup-content-wrapper {
+            border-radius: 1rem;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+        .leaflet-popup-content {
+            margin: 16px;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 text-gray-900 font-sans antialiased">
+
+    <div id="app-container">
+        <!-- Header -->
+        <header class="bg-[#0057B7] text-white p-4 pt-safe shadow-md z-50 flex items-center justify-center">
+            <h1 class="text-xl font-bold tracking-wide">Ukrainian Cities</h1>
+        </header>
+
+        <!-- Main Content Area -->
+        <main class="flex-1 relative flex flex-col">
+            
+            <!-- MAP VIEW -->
+            <div id="map-container" class="block">
+                <div id="map"></div>
+            </div>
+
+            <!-- LIST VIEW -->
+            <div id="list-container" class="hidden pb-20">
+                <ul id="city-list" class="divide-y divide-gray-200">
+                    <!-- List items generated via JS -->
+                </ul>
+            </div>
+            
+        </main>
+
+        <!-- Bottom Navigation -->
+        <nav class="bg-white border-t border-gray-200 fixed bottom-0 w-full z-50 pb-safe">
+            <div class="flex justify-around items-center h-16">
+                <button onclick="switchView('map')" id="nav-map" class="flex-1 flex flex-col items-center justify-center text-[#0057B7] transition-colors">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+                    </svg>
+                    <span class="text-xs font-medium">Map</span>
+                </button>
+                <button onclick="switchView('list')" id="nav-list" class="flex-1 flex flex-col items-center justify-center text-gray-400 hover:text-gray-600 transition-colors">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 10h16M4 14h16M4 18h16" />
+                    </svg>
+                    <span class="text-xs font-medium">List</span>
+                </button>
+            </div>
+        </nav>
+    </div>
+
+    <!-- Notification Toast (Hidden by default) -->
+    <div id="toast" class="fixed top-20 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white px-4 py-2 rounded-full shadow-lg z-[9999] opacity-0 pointer-events-none transition-opacity duration-300">
+        Message
+    </div>
+
+    <script>
+        // --- Data ---
+        const cities = [
+            { id: 'kyiv', en: 'Kyiv', uk: 'Київ', lat: 50.4501, lng: 30.5234 },
+            { id: 'kharkiv', en: 'Kharkiv', uk: 'Харків', lat: 49.9935, lng: 36.2304 },
+            { id: 'odesa', en: 'Odesa', uk: 'Одеса', lat: 46.4825, lng: 30.7233 },
+            { id: 'lviv', en: 'Lviv', uk: 'Львів', lat: 49.8397, lng: 24.0297 },
+            { id: 'dnipro', en: 'Dnipro', uk: 'Дніпро', lat: 48.4647, lng: 35.0462 },
+            { id: 'zaporizhzhia', en: 'Zaporizhzhia', uk: 'Запоріжжя', lat: 47.8388, lng: 35.1396 },
+            { id: 'vinnytsia', en: 'Vinnytsia', uk: 'Вінниця', lat: 49.2331, lng: 28.4682 },
+            { id: 'kherson', en: 'Kherson', uk: 'Херсон', lat: 46.6354, lng: 32.6169 },
+            { id: 'poltava', en: 'Poltava', uk: 'Полтава', lat: 49.5883, lng: 34.5514 },
+            { id: 'chernihiv', en: 'Chernihiv', uk: 'Чернігів', lat: 51.4982, lng: 31.2893 },
+            { id: 'cherkasy', en: 'Cherkasy', uk: 'Черкаси', lat: 49.4444, lng: 32.0598 },
+            { id: 'sumy', en: 'Sumy', uk: 'Суми', lat: 50.9077, lng: 34.7981 },
+            { id: 'zhytomyr', en: 'Zhytomyr', uk: 'Житомир', lat: 50.2547, lng: 28.6587 },
+            { id: 'mariupol', en: 'Mariupol', uk: 'Маріуполь', lat: 47.0971, lng: 37.5434 },
+            { id: 'kryvyirih', en: 'Kryvyi Rih', uk: 'Кривий Ріг', lat: 47.9105, lng: 33.3918 },
+            { id: 'mykolaiv', en: 'Mykolaiv', uk: 'Миколаїв', lat: 46.9750, lng: 31.9946 }
+        ];
+
+        // --- State ---
+        let map;
+        let favorites = new Set();
+        let currentView = 'map';
+
+        // --- Initialization ---
+        document.addEventListener('DOMContentLoaded', () => {
+            initPWA();
+            loadFavorites();
+            initMap();
+            renderList();
+        });
+
+        // --- PWA Setup (Inline Manifest & Service Worker) ---
+        function initPWA() {
+            // 1. Generate Manifest
+            const manifest = {
+                name: "Ukrainian Cities",
+                short_name: "UA Cities",
+                start_url: "./",
+                display: "standalone",
+                background_color: "#f3f4f6",
+                theme_color: "#0057B7",
+                icons: [{
+                    src: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' fill='%230057B7'/%3E%3Ctext x='50' y='65' font-size='50' text-anchor='middle' fill='%23ffd200' font-family='sans-serif'%3E🇺🇦%3C/text%3E%3C/svg%3E",
+                    sizes: "512x512",
+                    type: "image/svg+xml"
+                }]
+            };
+            const manifestBlob = new Blob([JSON.stringify(manifest)], {type: 'application/manifest+json'});
+            const manifestUrl = URL.createObjectURL(manifestBlob);
+            const link = document.createElement('link');
+            link.rel = 'manifest';
+            link.href = manifestUrl;
+            document.head.appendChild(link);
+
+            // 2. Generate and Register Service Worker for offline support
+            if ('serviceWorker' in navigator) {
+                const swCode = `
+                    const CACHE_NAME = 'ua-cities-cache-v1';
+                    self.addEventListener('install', e => {
+                        e.waitUntil(
+                            caches.open(CACHE_NAME).then(cache => {
+                                return cache.addAll([
+                                    location.href,
+                                    'https://cdn.tailwindcss.com',
+                                    'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css',
+                                    'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js'
+                                ]);
+                            })
+                        );
+                    });
+                    self.addEventListener('fetch', e => {
+                        e.respondWith(
+                            caches.match(e.request).then(response => {
+                                return response || fetch(e.request).then(fetchRes => {
+                                    // Cache map tiles on the fly for offline use
+                                    if (e.request.url.includes('openstreetmap.org')) {
+                                        const resClone = fetchRes.clone();
+                                        caches.open(CACHE_NAME).then(cache => {
+                                            cache.put(e.request, resClone);
+                                        });
+                                    }
+                                    return fetchRes;
+                                }).catch(() => {
+                                    // Handle network failure gracefully (offline mode)
+                                });
+                            })
+                        );
+                    });
+                `;
+                const swBlob = new Blob([swCode], {type: 'application/javascript'});
+                const swUrl = URL.createObjectURL(swBlob);
+                navigator.serviceWorker.register(swUrl).catch(err => console.log('SW registration failed:', err));
+            }
+        }
+
+        // --- TTS Functionality ---
+        window.speakCity = function(ukrainianText) {
+            if (!('speechSynthesis' in window)) {
+                showToast("Text-to-speech is not supported on this device.");
+                return;
+            }
+
+            // Cancel any currently playing speech
+            window.speechSynthesis.cancel();
+
+            const utterance = new SpeechSynthesisUtterance(ukrainianText);
+            utterance.lang = 'uk-UA'; 
+            utterance.rate = 0.85; // Slightly slower for clearer pronunciation
+            utterance.pitch = 1.0;
+
+            window.speechSynthesis.speak(utterance);
+        };
+
+        // --- View Switching ---
+        window.switchView = function(view) {
+            if (view === currentView) return;
+            currentView = view;
+
+            const mapContainer = document.getElementById('map-container');
+            const listContainer = document.getElementById('list-container');
+            const navMap = document.getElementById('nav-map');
+            const navList = document.getElementById('nav-list');
+
+            const activeClass = 'text-[#0057B7]';
+            const inactiveClass = 'text-gray-400';
+
+            if (view === 'map') {
+                mapContainer.classList.remove('hidden');
+                mapContainer.classList.add('block');
+                listContainer.classList.remove('block');
+                listContainer.classList.add('hidden');
+                
+                navMap.classList.add(activeClass);
+                navMap.classList.remove(inactiveClass);
+                navList.classList.add(inactiveClass);
+                navList.classList.remove(activeClass);
+
+                // Leaflet needs to recalculate size if it was hidden
+                setTimeout(() => { map.invalidateSize(); }, 50);
+            } else {
+                mapContainer.classList.remove('block');
+                mapContainer.classList.add('hidden');
+                listContainer.classList.remove('hidden');
+                listContainer.classList.add('block');
+
+                navList.classList.add(activeClass);
+                navList.classList.remove(inactiveClass);
+                navMap.classList.add(inactiveClass);
+                navMap.classList.remove(activeClass);
+                
+                renderList(); // Re-render to ensure sorting is correct
+            }
+        };
+
+        // --- Map Initialization ---
+        function initMap() {
+            // Restrict bounds strictly to Ukraine
+            const ukraineBounds = [
+                [44.2, 22.0], // Southwest (Crimea/Zakarpattia boundaries)
+                [52.4, 40.3]  // Northeast (Chernihiv/Luhansk boundaries)
+            ];
+
+            // Center of Ukraine roughly
+            map = L.map('map', {
+                zoomControl: false, // Move to bottom right so it doesn't overlap header
+                maxBounds: ukraineBounds,
+                maxBoundsViscosity: 1.0, // Solid bounce-back, no panning out of Ukraine
+                minZoom: 6,              // Restrict zooming out too far
+            }).setView([48.3794, 31.1656], 6);
+            
+            L.control.zoom({ position: 'bottomright' }).addTo(map);
+
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                maxZoom: 19,
+                minZoom: 6,
+                bounds: ukraineBounds, // Prevent fetching map tiles outside Ukraine
+                attribution: '© OpenStreetMap'
+            }).addTo(map);
+
+            cities.forEach(city => {
+                const marker = L.marker([city.lat, city.lng]).addTo(map);
+                
+                // HTML for the Leaflet Popup
+                const popupContent = `
+                    <div class="text-center min-w-[150px]">
+                        <h3 class="font-bold text-lg text-gray-900 mb-1">${city.en}</h3>
+                        <p class="text-md text-[#0057B7] font-semibold mb-3">${city.uk}</p>
+                        <button onclick="window.speakCity('${city.uk}')" class="w-full bg-[#0057B7] text-white py-2 px-4 rounded-lg shadow-sm flex items-center justify-center gap-2 active:bg-blue-800 transition-colors">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd" />
+                            </svg>
+                            Listen
+                        </button>
+                    </div>
+                `;
+                marker.bindPopup(popupContent);
+            });
+        }
+
+        // --- Favorites Management ---
+        function loadFavorites() {
+            const stored = localStorage.getItem('ua-cities-favorites');
+            if (stored) {
+                try {
+                    favorites = new Set(JSON.parse(stored));
+                } catch (e) {
+                    favorites = new Set();
+                }
+            }
+        }
+
+        function saveFavorites() {
+            localStorage.setItem('ua-cities-favorites', JSON.stringify([...favorites]));
+        }
+
+        window.toggleFavorite = function(cityId) {
+            if (favorites.has(cityId)) {
+                favorites.delete(cityId);
+            } else {
+                favorites.add(cityId);
+            }
+            saveFavorites();
+            renderList(); // Instantly update UI and sorting
+        };
+
+        // --- List View Rendering ---
+        function renderList() {
+            const listContainer = document.getElementById('city-list');
+            listContainer.innerHTML = ''; // Clear existing
+
+            // Sort logic: Favorited first, then alphabetical by English name
+            const sortedCities = [...cities].sort((a, b) => {
+                const aFav = favorites.has(a.id);
+                const bFav = favorites.has(b.id);
+                
+                if (aFav && !bFav) return -1;
+                if (!aFav && bFav) return 1;
+                
+                return a.en.localeCompare(b.en);
+            });
+
+            sortedCities.forEach(city => {
+                const isFav = favorites.has(city.id);
+                const li = document.createElement('li');
+                li.className = "bg-white p-4 flex items-center justify-between shadow-sm mb-1 rounded-lg mx-2 mt-2";
+                
+                li.innerHTML = `
+                    <div class="flex-1 min-w-0 pr-4">
+                        <div class="text-lg font-bold text-gray-900 truncate">${city.en}</div>
+                        <div class="text-sm text-[#0057B7] font-medium truncate">${city.uk}</div>
+                    </div>
+                    <div class="flex items-center space-x-3">
+                        <button onclick="window.speakCity('${city.uk}')" class="p-3 bg-blue-50 text-[#0057B7] rounded-full active:bg-blue-100 transition-colors" aria-label="Play pronunciation">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="currentColor" viewBox="0 0 24 24">
+                                <path d="M8 5v14l11-7z" />
+                            </svg>
+                        </button>
+                        <button onclick="window.toggleFavorite('${city.id}')" class="p-3 rounded-full transition-colors ${isFav ? 'text-yellow-400' : 'text-gray-300'}" aria-label="Toggle favorite">
+                            ${isFav 
+                                ? `<svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" viewBox="0 0 20 20" fill="currentColor">
+                                     <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                                   </svg>`
+                                : `<svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                     <path stroke-linecap="round" stroke-linejoin="round" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+                                   </svg>`
+                            }
+                        </button>
+                    </div>
+                `;
+                listContainer.appendChild(li);
+            });
+        }
+
+        // --- Utility ---
+        function showToast(message) {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.classList.remove('opacity-0');
+            
+            setTimeout(() => {
+                toast.classList.add('opacity-0');
+            }, 3000);
+        }
+    </script>
+</body>
+</html>
