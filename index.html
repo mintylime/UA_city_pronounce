@@ -122,33 +122,29 @@
     <script>
         // --- Data ---
         const cities = [
-            { id: 'kyiv', en: 'Kyiv', uk: 'Київ', lat: 50.4501, lng: 30.5234 },
-            { id: 'kharkiv', en: 'Kharkiv', uk: 'Харків', lat: 49.9935, lng: 36.2304 },
-            { id: 'odesa', en: 'Odesa', uk: 'Одеса', lat: 46.4825, lng: 30.7233 },
-            { id: 'lviv', en: 'Lviv', uk: 'Львів', lat: 49.8397, lng: 24.0297 },
-            { id: 'dnipro', en: 'Dnipro', uk: 'Дніпро', lat: 48.4647, lng: 35.0462 },
-            { id: 'zaporizhzhia', en: 'Zaporizhzhia', uk: 'Запоріжжя', lat: 47.8388, lng: 35.1396 },
-            { id: 'vinnytsia', en: 'Vinnytsia', uk: 'Вінниця', lat: 49.2331, lng: 28.4682 },
-            { id: 'kherson', en: 'Kherson', uk: 'Херсон', lat: 46.6354, lng: 32.6169 },
-            { id: 'poltava', en: 'Poltava', uk: 'Полтава', lat: 49.5883, lng: 34.5514 },
-            { id: 'chernihiv', en: 'Chernihiv', uk: 'Чернігів', lat: 51.4982, lng: 31.2893 },
-            { id: 'cherkasy', en: 'Cherkasy', uk: 'Черкаси', lat: 49.4444, lng: 32.0598 },
-            { id: 'sumy', en: 'Sumy', uk: 'Суми', lat: 50.9077, lng: 34.7981 },
-            { id: 'zhytomyr', en: 'Zhytomyr', uk: 'Житомир', lat: 50.2547, lng: 28.6587 },
-            { id: 'mariupol', en: 'Mariupol', uk: 'Маріуполь', lat: 47.0971, lng: 37.5434 },
-            { id: 'kryvyirih', en: 'Kryvyi Rih', uk: 'Кривий Ріг', lat: 47.9105, lng: 33.3918 },
-            { id: 'mykolaiv', en: 'Mykolaiv', uk: 'Миколаїв', lat: 46.9750, lng: 31.9946 }
+            { id: 'kyiv', name: 'Kyiv', cyrillic: 'Київ', phonetic: 'KYY-yiv', lat: 50.4501, lng: 30.5234 },
+            { id: 'kharkiv', name: 'Kharkiv', cyrillic: 'Харків', phonetic: 'KHAR-keev', lat: 49.9935, lng: 36.2304 },
+            { id: 'odesa', name: 'Odesa', cyrillic: 'Одеса', phonetic: 'ah-DEH-sah', lat: 46.4825, lng: 30.7233 },
+            { id: 'lviv', name: 'Lviv', cyrillic: 'Львів', phonetic: 'L-veev', lat: 49.8397, lng: 24.0297 },
+            { id: 'dnipro', name: 'Dnipro', cyrillic: 'Дніпро', phonetic: 'dnee-PRO', lat: 48.4647, lng: 35.0462 },
+            { id: 'zaporizhzhia', name: 'Zaporizhzhia', cyrillic: 'Запоріжжя', phonetic: 'zah-poh-REEZH-zhya', lat: 47.8388, lng: 35.1396 },
+            { id: 'mykolaiv', name: 'Mykolaiv', cyrillic: 'Миколаїв', phonetic: 'my-koh-LAH-yiv', lat: 46.9750, lng: 31.9946 },
+            { id: 'kherson', name: 'Kherson', cyrillic: 'Херсон', phonetic: 'kher-SOHN', lat: 46.6354, lng: 32.6169 },
+            { id: 'poltava', name: 'Poltava', cyrillic: 'Полтава', phonetic: 'pohl-TAH-vah', lat: 49.5883, lng: 34.5514 },
+            { id: 'chernihiv', name: 'Chernihiv', cyrillic: 'Чернігів', phonetic: 'cher-NEE-heev', lat: 51.4982, lng: 31.2893 }
         ];
 
         // --- State ---
         let map;
         let favorites = new Set();
         let currentView = 'map';
+        let ukVoice = null;
 
         // --- Initialization ---
         document.addEventListener('DOMContentLoaded', () => {
             initPWA();
             loadFavorites();
+            loadVoices();
             initMap();
             renderList();
         });
@@ -218,7 +214,18 @@
         }
 
         // --- TTS Functionality ---
-        window.speakCity = function(ukrainianText) {
+        function loadVoices() {
+            const voices = window.speechSynthesis.getVoices();
+            // Try to find a native Ukrainian voice to assign
+            ukVoice = voices.find(v => v.lang === 'uk-UA' || v.lang.startsWith('uk'));
+        }
+        
+        // Browsers load voices asynchronously, so we listen for when they are ready
+        if ('speechSynthesis' in window) {
+            window.speechSynthesis.onvoiceschanged = loadVoices;
+        }
+
+        window.speakCity = function(cyrillicText) {
             if (!('speechSynthesis' in window)) {
                 showToast("Text-to-speech is not supported on this device.");
                 return;
@@ -227,8 +234,13 @@
             // Cancel any currently playing speech
             window.speechSynthesis.cancel();
 
-            const utterance = new SpeechSynthesisUtterance(ukrainianText);
+            const utterance = new SpeechSynthesisUtterance(cyrillicText);
             utterance.lang = 'uk-UA'; 
+            
+            if (ukVoice) {
+                utterance.voice = ukVoice;
+            }
+
             utterance.rate = 0.85; // Slightly slower for clearer pronunciation
             utterance.pitch = 1.0;
 
@@ -307,9 +319,10 @@
                 // HTML for the Leaflet Popup
                 const popupContent = `
                     <div class="text-center min-w-[150px]">
-                        <h3 class="font-bold text-lg text-gray-900 mb-1">${city.en}</h3>
-                        <p class="text-md text-[#0057B7] font-semibold mb-3">${city.uk}</p>
-                        <button onclick="window.speakCity('${city.uk}')" class="w-full bg-[#0057B7] text-white py-2 px-4 rounded-lg shadow-sm flex items-center justify-center gap-2 active:bg-blue-800 transition-colors">
+                        <h3 class="font-bold text-lg text-gray-900 mb-0">${city.name}</h3>
+                        <p class="text-sm text-gray-500 italic mb-1">${city.phonetic}</p>
+                        <p class="text-md text-[#0057B7] font-semibold mb-3">${city.cyrillic}</p>
+                        <button onclick="window.speakCity('${city.cyrillic}')" class="w-full bg-[#0057B7] text-white py-2 px-4 rounded-lg shadow-sm flex items-center justify-center gap-2 active:bg-blue-800 transition-colors">
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                                 <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd" />
                             </svg>
@@ -360,7 +373,7 @@
                 if (aFav && !bFav) return -1;
                 if (!aFav && bFav) return 1;
                 
-                return a.en.localeCompare(b.en);
+                return a.name.localeCompare(b.name);
             });
 
             sortedCities.forEach(city => {
@@ -370,11 +383,12 @@
                 
                 li.innerHTML = `
                     <div class="flex-1 min-w-0 pr-4">
-                        <div class="text-lg font-bold text-gray-900 truncate">${city.en}</div>
-                        <div class="text-sm text-[#0057B7] font-medium truncate">${city.uk}</div>
+                        <div class="text-lg font-bold text-gray-900 truncate">${city.name}</div>
+                        <div class="text-xs text-gray-500 italic mb-1">${city.phonetic}</div>
+                        <div class="text-sm text-[#0057B7] font-medium truncate">${city.cyrillic}</div>
                     </div>
                     <div class="flex items-center space-x-3">
-                        <button onclick="window.speakCity('${city.uk}')" class="p-3 bg-blue-50 text-[#0057B7] rounded-full active:bg-blue-100 transition-colors" aria-label="Play pronunciation">
+                        <button onclick="window.speakCity('${city.cyrillic}')" class="p-3 bg-blue-50 text-[#0057B7] rounded-full active:bg-blue-100 transition-colors" aria-label="Play pronunciation">
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="currentColor" viewBox="0 0 24 24">
                                 <path d="M8 5v14l11-7z" />
                             </svg>
