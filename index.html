@@ -5,441 +5,359 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Learn Ukrainian Cities</title>
     
-    <!-- PWA / Mobile App Meta Tags -->
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
-    <meta name="theme-color" content="#0057B7"> <!-- Ukrainian Blue -->
+    <meta name="theme-color" content="#0057B7">
     
-    <!-- Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    
-    <!-- Leaflet CSS -->
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin=""/>
-    
-    <!-- Leaflet JS -->
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
-
     <style>
-        /* Custom Styles for App-like feel */
-        body {
-            overscroll-behavior-y: none; /* Prevent pull-to-refresh on mobile */
-            -webkit-tap-highlight-color: transparent;
+        :root {
+            --ukr-blue: #0057B7;
+            --ukr-yellow: #ffd200;
+            --bg-color: #f3f4f6;
+            --text-color: #111827;
+            --gray-text: #6b7280;
+            --card-bg: #ffffff;
+            --border-color: #e5e7eb;
         }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
         
-        #app-container {
-            height: 100vh;
-            height: 100dvh; /* Dynamic viewport height for mobile browsers */
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            overscroll-behavior-y: none;
+            -webkit-tap-highlight-color: transparent;
             display: flex;
             flex-direction: column;
+            height: 100vh;
+            height: 100dvh;
         }
 
-        #map-container, #list-container {
-            flex: 1;
-            position: relative;
-            overflow: hidden;
+        .pb-safe { padding-bottom: env(safe-area-inset-bottom, 20px); }
+        .pt-safe { padding-top: env(safe-area-inset-top, 0px); }
+
+        header {
+            background-color: var(--ukr-blue);
+            color: white;
+            padding: 1rem;
+            text-align: center;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            z-index: 50;
         }
 
-        #map {
+        /* Toggle Switch Settings */
+        .toggle-container {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            background: #eef2f6;
+            padding: 10px;
+            font-size: 14px;
+            font-weight: 600;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .switch { position: relative; display: inline-block; width: 50px; height: 26px; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #ccc; transition: .4s; border-radius: 34px; }
+        .slider:before { position: absolute; content: ""; height: 18px; width: 18px; left: 4px; bottom: 4px; background-color: white; transition: .4s; border-radius: 50%; }
+        input:checked + .slider { background-color: var(--ukr-blue); }
+        input:checked + .slider:before { transform: translateX(24px); }
+
+        main { flex: 1; position: relative; overflow: hidden; display: flex; flex-direction: column; }
+
+        /* Map Container */
+        #map-container { flex: 1; position: relative; background: #e0e7ff; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+        
+        .map-wrapper { position: relative; width: 95%; max-width: 500px; aspect-ratio: 1.5; }
+        
+        svg.ukraine-map { width: 100%; height: 100%; drop-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        
+        .city-dot {
             position: absolute;
-            top: 0;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            width: 100%;
-            height: 100%;
-            z-index: 10;
+            width: 16px;
+            height: 16px;
+            background-color: var(--ukr-yellow);
+            border: 3px solid var(--ukr-blue);
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            cursor: pointer;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
         }
 
-        #list-container {
-            overflow-y: auto;
-            background-color: #f3f4f6;
-            -webkit-overflow-scrolling: touch;
+        .city-label {
+            position: absolute;
+            background: rgba(255,255,255,0.9);
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: bold;
+            pointer-events: none;
+            transform: translate(-50%, -150%);
+            box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+            white-space: nowrap;
         }
 
-        /* Safe area padding for iPhones with notches */
-        .pb-safe { padding-bottom: env(safe-area-inset-bottom); }
-        .pt-safe { padding-top: env(safe-area-inset-top); }
+        /* List Container */
+        #list-container { flex: 1; overflow-y: auto; display: none; padding-bottom: 80px; }
+        ul { list-style: none; }
+        li {
+            background: var(--card-bg);
+            margin: 8px 12px;
+            padding: 16px;
+            border-radius: 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+        }
 
-        /* Leaflet popup customization */
-        .leaflet-popup-content-wrapper {
-            border-radius: 1rem;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        .city-info { flex: 1; }
+        .city-name { font-size: 1.1rem; font-weight: bold; margin-bottom: 2px; }
+        .city-phonetic { font-size: 0.8rem; color: var(--gray-text); font-style: italic; margin-bottom: 2px; }
+        .city-cyrillic { font-size: 0.9rem; color: var(--ukr-blue); font-weight: 600; }
+
+        .actions { display: flex; gap: 12px; align-items: center; }
+        .btn-play, .btn-fav {
+            background: none; border: none; padding: 8px; border-radius: 50%; cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
         }
-        .leaflet-popup-content {
-            margin: 16px;
+        .btn-play { background: #eff6ff; color: var(--ukr-blue); }
+        .btn-fav { color: #d1d5db; }
+        .btn-fav.active { color: var(--ukr-yellow); }
+
+        /* Nav */
+        nav {
+            background: white; border-top: 1px solid var(--border-color);
+            position: fixed; bottom: 0; width: 100%; z-index: 50;
+            display: flex; justify-content: space-around; height: 60px;
         }
+        nav button {
+            flex: 1; background: none; border: none; color: var(--gray-text);
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            font-size: 0.75rem; font-weight: 600; cursor: pointer;
+        }
+        nav button.active { color: var(--ukr-blue); }
+        nav svg { width: 24px; height: 24px; margin-bottom: 2px; }
+
+        /* Toast */
+        #toast {
+            position: fixed; top: 80px; left: 50%; transform: translateX(-50%);
+            background: rgba(17, 24, 39, 0.9); color: white; padding: 8px 16px;
+            border-radius: 20px; font-size: 14px; opacity: 0; transition: opacity 0.3s;
+            pointer-events: none; z-index: 9999; text-align: center;
+        }
+        .show-toast { opacity: 1 !important; }
     </style>
 </head>
-<body class="bg-gray-100 text-gray-900 font-sans antialiased">
+<body>
 
-    <div id="app-container">
-        <!-- Header -->
-        <header class="bg-[#0057B7] text-white p-4 pt-safe shadow-md z-50 flex items-center justify-center">
-            <h1 class="text-xl font-bold tracking-wide">Ukrainian Cities</h1>
-        </header>
+    <header class="pt-safe">
+        <h1>Ukrainian Cities</h1>
+    </header>
 
-        <!-- Main Content Area -->
-        <main class="flex-1 relative flex flex-col">
-            
-            <!-- MAP VIEW -->
-            <div id="map-container" class="block">
-                <div id="map"></div>
-            </div>
-
-            <!-- LIST VIEW -->
-            <div id="list-container" class="hidden pb-20">
-                <ul id="city-list" class="divide-y divide-gray-200">
-                    <!-- List items generated via JS -->
-                </ul>
-            </div>
-            
-        </main>
-
-        <!-- Bottom Navigation -->
-        <nav class="bg-white border-t border-gray-200 fixed bottom-0 w-full z-50 pb-safe">
-            <div class="flex justify-around items-center h-16">
-                <button onclick="switchView('map')" id="nav-map" class="flex-1 flex flex-col items-center justify-center text-[#0057B7] transition-colors">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
-                    </svg>
-                    <span class="text-xs font-medium">Map</span>
-                </button>
-                <button onclick="switchView('list')" id="nav-list" class="flex-1 flex flex-col items-center justify-center text-gray-400 hover:text-gray-600 transition-colors">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 10h16M4 14h16M4 18h16" />
-                    </svg>
-                    <span class="text-xs font-medium">List</span>
-                </button>
-            </div>
-        </nav>
+    <div class="toggle-container">
+        <span id="label-eng">English (Phonetic)</span>
+        <label class="switch">
+            <input type="checkbox" id="voice-toggle" checked onchange="updateToggleUI()">
+            <span class="slider"></span>
+        </label>
+        <span id="label-cyr" style="color: var(--ukr-blue);">Cyrillic (Native)</span>
     </div>
 
-    <!-- Notification Toast (Hidden by default) -->
-    <div id="toast" class="fixed top-20 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white px-4 py-2 rounded-full shadow-lg z-[9999] opacity-0 pointer-events-none transition-opacity duration-300">
-        Message
-    </div>
+    <main>
+        <!-- Map View -->
+        <div id="map-container">
+            <div class="map-wrapper" id="map-wrapper">
+                <!-- Offline SVG shape of Ukraine -->
+                <svg class="ukraine-map" viewBox="0 0 100 65" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M12,28 C15,20 25,12 35,8 C45,10 50,5 60,6 C75,8 85,15 95,25 C98,35 90,45 80,48 C75,50 70,62 65,62 C60,62 55,50 45,48 C35,45 20,40 10,35 Z" fill="#b9def5" stroke="#0057B7" stroke-width="0.5"/>
+                </svg>
+            </div>
+        </div>
+
+        <!-- List View -->
+        <div id="list-container">
+            <ul id="city-list"></ul>
+        </div>
+    </main>
+
+    <nav class="pb-safe">
+        <button onclick="switchView('map')" id="nav-map" class="active">
+            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" /></svg>
+            Map
+        </button>
+        <button onclick="switchView('list')" id="nav-list">
+            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 10h16M4 14h16M4 18h16" /></svg>
+            List
+        </button>
+    </nav>
+
+    <div id="toast">Message</div>
 
     <script>
         // --- Data ---
+        // x and y are percentages mapped to our custom SVG viewBox
+        // ttsPhonetic is engineered specifically to force English text-to-speech to sound Ukrainian
         const cities = [
-            { id: 'kyiv', name: 'Kyiv', cyrillic: 'Київ', phonetic: 'KYY-yiv', lat: 50.4501, lng: 30.5234 },
-            { id: 'kharkiv', name: 'Kharkiv', cyrillic: 'Харків', phonetic: 'KHAR-keev', lat: 49.9935, lng: 36.2304 },
-            { id: 'odesa', name: 'Odesa', cyrillic: 'Одеса', phonetic: 'ah-DEH-sah', lat: 46.4825, lng: 30.7233 },
-            { id: 'lviv', name: 'Lviv', cyrillic: 'Львів', phonetic: 'L-veev', lat: 49.8397, lng: 24.0297 },
-            { id: 'dnipro', name: 'Dnipro', cyrillic: 'Дніпро', phonetic: 'dnee-PRO', lat: 48.4647, lng: 35.0462 },
-            { id: 'zaporizhzhia', name: 'Zaporizhzhia', cyrillic: 'Запоріжжя', phonetic: 'zah-poh-REEZH-zhya', lat: 47.8388, lng: 35.1396 },
-            { id: 'mykolaiv', name: 'Mykolaiv', cyrillic: 'Миколаїв', phonetic: 'my-koh-LAH-yiv', lat: 46.9750, lng: 31.9946 },
-            { id: 'kherson', name: 'Kherson', cyrillic: 'Херсон', phonetic: 'kher-SOHN', lat: 46.6354, lng: 32.6169 },
-            { id: 'poltava', name: 'Poltava', cyrillic: 'Полтава', phonetic: 'pohl-TAH-vah', lat: 49.5883, lng: 34.5514 },
-            { id: 'chernihiv', name: 'Chernihiv', cyrillic: 'Чернігів', phonetic: 'cher-NEE-heev', lat: 51.4982, lng: 31.2893 }
+            { id: 'kyiv', name: 'Kyiv', cyrillic: 'Київ', displayPhonetic: 'KYY-yiv', ttsPhonetic: 'KEY yiv', x: 48, y: 22 },
+            { id: 'kharkiv', name: 'Kharkiv', cyrillic: 'Харків', displayPhonetic: 'KHAR-keev', ttsPhonetic: 'CAR keev', x: 75, y: 25 },
+            { id: 'odesa', name: 'Odesa', cyrillic: 'Одеса', displayPhonetic: 'ah-DEH-sah', ttsPhonetic: 'oh DESS uh', x: 50, y: 55 },
+            { id: 'lviv', name: 'Lviv', cyrillic: 'Львів', displayPhonetic: 'L-veev', ttsPhonetic: 'luh VEEV', x: 18, y: 28 },
+            { id: 'dnipro', name: 'Dnipro', cyrillic: 'Дніпро', displayPhonetic: 'dnee-PRO', ttsPhonetic: 'dnee PRO', x: 65, y: 40 },
+            { id: 'zaporizhzhia', name: 'Zaporizhzhia', cyrillic: 'Запоріжжя', displayPhonetic: 'zah-poh-REEZH-zhya', ttsPhonetic: 'zah po REE zha', x: 70, y: 46 },
+            { id: 'mykolaiv', name: 'Mykolaiv', cyrillic: 'Миколаїв', displayPhonetic: 'my-koh-LAH-yiv', ttsPhonetic: 'mih ko LYE iv', x: 55, y: 50 },
+            { id: 'kherson', name: 'Kherson', cyrillic: 'Херсон', displayPhonetic: 'kher-SOHN', ttsPhonetic: 'hair SOHN', x: 60, y: 54 },
+            { id: 'poltava', name: 'Poltava', cyrillic: 'Полтава', displayPhonetic: 'pohl-TAH-vah', ttsPhonetic: 'pole TAH vuh', x: 65, y: 28 },
+            { id: 'chernihiv', name: 'Chernihiv', cyrillic: 'Чернігів', displayPhonetic: 'cher-NEE-heev', ttsPhonetic: 'chair NEE hiv', x: 52, y: 12 }
         ];
 
-        // --- State ---
-        let map;
         let favorites = new Set();
-        let currentView = 'map';
 
-        // --- Initialization ---
         document.addEventListener('DOMContentLoaded', () => {
-            initPWA();
             loadFavorites();
-            initMap();
+            renderMap();
             renderList();
         });
 
-        // --- PWA Setup (Inline Manifest & Service Worker) ---
-        function initPWA() {
-            // 1. Generate Manifest
-            const manifest = {
-                name: "Ukrainian Cities",
-                short_name: "UA Cities",
-                start_url: "./",
-                display: "standalone",
-                background_color: "#f3f4f6",
-                theme_color: "#0057B7",
-                icons: [{
-                    src: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' fill='%230057B7'/%3E%3Ctext x='50' y='65' font-size='50' text-anchor='middle' fill='%23ffd200' font-family='sans-serif'%3E🇺🇦%3C/text%3E%3C/svg%3E",
-                    sizes: "512x512",
-                    type: "image/svg+xml"
-                }]
-            };
-            const manifestBlob = new Blob([JSON.stringify(manifest)], {type: 'application/manifest+json'});
-            const manifestUrl = URL.createObjectURL(manifestBlob);
-            const link = document.createElement('link');
-            link.rel = 'manifest';
-            link.href = manifestUrl;
-            document.head.appendChild(link);
-
-            // 2. Generate and Register Service Worker for offline support
-            if ('serviceWorker' in navigator) {
-                const swCode = `
-                    const CACHE_NAME = 'ua-cities-cache-v1';
-                    self.addEventListener('install', e => {
-                        e.waitUntil(
-                            caches.open(CACHE_NAME).then(cache => {
-                                return cache.addAll([
-                                    location.href,
-                                    'https://cdn.tailwindcss.com',
-                                    'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css',
-                                    'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js'
-                                ]);
-                            })
-                        );
-                    });
-                    self.addEventListener('fetch', e => {
-                        e.respondWith(
-                            caches.match(e.request).then(response => {
-                                return response || fetch(e.request).then(fetchRes => {
-                                    // Cache map tiles on the fly for offline use
-                                    if (e.request.url.includes('openstreetmap.org')) {
-                                        const resClone = fetchRes.clone();
-                                        caches.open(CACHE_NAME).then(cache => {
-                                            cache.put(e.request, resClone);
-                                        });
-                                    }
-                                    return fetchRes;
-                                }).catch(() => {
-                                    // Handle network failure gracefully (offline mode)
-                                });
-                            })
-                        );
-                    });
-                `;
-                const swBlob = new Blob([swCode], {type: 'application/javascript'});
-                const swUrl = URL.createObjectURL(swBlob);
-                navigator.serviceWorker.register(swUrl).catch(err => console.log('SW registration failed:', err));
-            }
+        // --- UI Updates ---
+        function updateToggleUI() {
+            const isCyrillic = document.getElementById('voice-toggle').checked;
+            document.getElementById('label-cyr').style.color = isCyrillic ? 'var(--ukr-blue)' : 'var(--gray-text)';
+            document.getElementById('label-eng').style.color = !isCyrillic ? 'var(--ukr-blue)' : 'var(--gray-text)';
+            
+            showToast(isCyrillic ? "Using Native Ukrainian Voice" : "Using English TTS Engine");
         }
 
-        // --- TTS Functionality ---
-        // Browsers load voices asynchronously, so we listen for when they are ready to force a load
-        if ('speechSynthesis' in window) {
-            window.speechSynthesis.onvoiceschanged = () => {
-                window.speechSynthesis.getVoices(); 
-            };
-        }
-
-        window.speakCity = function(cyrillicText) {
-            if (!('speechSynthesis' in window)) {
-                showToast("Text-to-speech is not supported on this device.");
-                return;
-            }
-
-            // Cancel any currently playing speech
-            window.speechSynthesis.cancel();
-
-            // We are explicitly passing the Cyrillic text here
-            const utterance = new SpeechSynthesisUtterance(cyrillicText);
-            utterance.lang = 'uk-UA'; 
-            
-            // 1. Get all available browser voices dynamically at play-time
-            const voices = window.speechSynthesis.getVoices();
-            
-            // 2. Find the specific Ukrainian voice (handles macOS/iOS strictness)
-            const ukVoice = voices.find(voice => voice.lang === 'uk-UA' || voice.lang.includes('uk-'));
-            
-            // 3. Force the utterance to use this specific voice object
-            if (ukVoice) {
-                utterance.voice = ukVoice;
-            } else {
-                showToast("⚠️ Ukrainian voice not found in browser! Using fallback.");
-            }
-
-            utterance.rate = 0.85; // Slightly slower for clearer pronunciation
-            utterance.pitch = 1.0;
-
-            window.speechSynthesis.speak(utterance);
-        };
-
-        // --- View Switching ---
-        window.switchView = function(view) {
-            if (view === currentView) return;
-            currentView = view;
-
-            const mapContainer = document.getElementById('map-container');
-            const listContainer = document.getElementById('list-container');
-            const navMap = document.getElementById('nav-map');
-            const navList = document.getElementById('nav-list');
-
-            const activeClass = 'text-[#0057B7]';
-            const inactiveClass = 'text-gray-400';
-
-            if (view === 'map') {
-                mapContainer.classList.remove('hidden');
-                mapContainer.classList.add('block');
-                listContainer.classList.remove('block');
-                listContainer.classList.add('hidden');
-                
-                navMap.classList.add(activeClass);
-                navMap.classList.remove(inactiveClass);
-                navList.classList.add(inactiveClass);
-                navList.classList.remove(activeClass);
-
-                // Leaflet needs to recalculate size if it was hidden
-                setTimeout(() => { map.invalidateSize(); }, 50);
-            } else {
-                mapContainer.classList.remove('block');
-                mapContainer.classList.add('hidden');
-                listContainer.classList.remove('hidden');
-                listContainer.classList.add('block');
-
-                navList.classList.add(activeClass);
-                navList.classList.remove(inactiveClass);
-                navMap.classList.add(inactiveClass);
-                navMap.classList.remove(activeClass);
-                
-                renderList(); // Re-render to ensure sorting is correct
-            }
-        };
-
-        // --- Map Initialization ---
-        function initMap() {
-            // Restrict bounds strictly to Ukraine
-            const ukraineBounds = [
-                [44.2, 22.0], // Southwest (Crimea/Zakarpattia boundaries)
-                [52.4, 40.3]  // Northeast (Chernihiv/Luhansk boundaries)
-            ];
-
-            // Center of Ukraine roughly
-            map = L.map('map', {
-                zoomControl: false, // Move to bottom right so it doesn't overlap header
-                maxBounds: ukraineBounds,
-                maxBoundsViscosity: 1.0, // Solid bounce-back, no panning out of Ukraine
-                minZoom: 6,              // Restrict zooming out too far
-            }).setView([48.3794, 31.1656], 6);
-            
-            L.control.zoom({ position: 'bottomright' }).addTo(map);
-
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                maxZoom: 19,
-                minZoom: 6,
-                bounds: ukraineBounds, // Prevent fetching map tiles outside Ukraine
-                attribution: '© OpenStreetMap'
-            }).addTo(map);
-
+        // --- Map Rendering (Offline Custom SVG) ---
+        function renderMap() {
+            const wrapper = document.getElementById('map-wrapper');
             cities.forEach(city => {
-                // Use circleMarker instead of standard tear-drop marker
-                const marker = L.circleMarker([city.lat, city.lng], {
-                    radius: 10,
-                    fillColor: "#ffd200", // Ukrainian Yellow
-                    color: "#0057B7",     // Ukrainian Blue
-                    weight: 3,
-                    opacity: 1,
-                    fillOpacity: 0.9
-                }).addTo(map);
+                // Dot
+                const dot = document.createElement('div');
+                dot.className = 'city-dot';
+                dot.style.left = `${city.x}%`;
+                dot.style.top = `${city.y}%`;
+                dot.onclick = () => speakCity(city.id);
                 
-                // HTML for the Leaflet Popup (Simplified since button is removed)
-                const popupContent = `
-                    <div class="text-center min-w-[120px] pointer-events-none">
-                        <h3 class="font-bold text-lg text-gray-900 mb-0">${city.name}</h3>
-                        <p class="text-sm text-gray-500 italic mb-1">${city.phonetic}</p>
-                        <p class="text-md text-[#0057B7] font-semibold">${city.cyrillic}</p>
-                    </div>
-                `;
+                // Label
+                const label = document.createElement('div');
+                label.className = 'city-label';
+                label.style.left = `${city.x}%`;
+                label.style.top = `${city.y}%`;
+                label.innerText = city.name;
                 
-                // We use { closeButton: false } to make it look cleaner on hover
-                marker.bindPopup(popupContent, { closeButton: false, offset: L.point(0, -5) });
-
-                // Event Listeners for Hover and Click
-                marker.on('mouseover', function (e) {
-                    this.openPopup();
-                });
-                
-                marker.on('mouseout', function (e) {
-                    this.closePopup();
-                });
-
-                marker.on('click', function (e) {
-                    // Speak the Cyrillic text to enforce native pronunciation rules
-                    window.speakCity(city.cyrillic);
-                });
+                wrapper.appendChild(dot);
+                wrapper.appendChild(label);
             });
         }
 
-        // --- Favorites Management ---
-        function loadFavorites() {
-            const stored = localStorage.getItem('ua-cities-favorites');
-            if (stored) {
-                try {
-                    favorites = new Set(JSON.parse(stored));
-                } catch (e) {
-                    favorites = new Set();
-                }
-            }
-        }
-
-        function saveFavorites() {
-            localStorage.setItem('ua-cities-favorites', JSON.stringify([...favorites]));
-        }
-
-        window.toggleFavorite = function(cityId) {
-            if (favorites.has(cityId)) {
-                favorites.delete(cityId);
-            } else {
-                favorites.add(cityId);
-            }
-            saveFavorites();
-            renderList(); // Instantly update UI and sorting
-        };
-
-        // --- List View Rendering ---
+        // --- List Rendering ---
         function renderList() {
-            const listContainer = document.getElementById('city-list');
-            listContainer.innerHTML = ''; // Clear existing
-
-            // Sort logic: Favorited first, then alphabetical by English name
+            const list = document.getElementById('city-list');
+            list.innerHTML = '';
+            
             const sortedCities = [...cities].sort((a, b) => {
                 const aFav = favorites.has(a.id);
                 const bFav = favorites.has(b.id);
-                
                 if (aFav && !bFav) return -1;
                 if (!aFav && bFav) return 1;
-                
                 return a.name.localeCompare(b.name);
             });
 
             sortedCities.forEach(city => {
                 const isFav = favorites.has(city.id);
                 const li = document.createElement('li');
-                li.className = "bg-white p-4 flex items-center justify-between shadow-sm mb-1 rounded-lg mx-2 mt-2";
-                
                 li.innerHTML = `
-                    <div class="flex-1 min-w-0 pr-4">
-                        <div class="text-lg font-bold text-gray-900 truncate">${city.name}</div>
-                        <div class="text-xs text-gray-500 italic mb-1">${city.phonetic}</div>
-                        <div class="text-sm text-[#0057B7] font-medium truncate">${city.cyrillic}</div>
+                    <div class="city-info" onclick="speakCity('${city.id}')">
+                        <div class="city-name">${city.name}</div>
+                        <div class="city-phonetic">${city.displayPhonetic}</div>
+                        <div class="city-cyrillic">${city.cyrillic}</div>
                     </div>
-                    <div class="flex items-center space-x-3">
-                        <button onclick="window.speakCity('${city.cyrillic}')" class="p-3 bg-blue-50 text-[#0057B7] rounded-full active:bg-blue-100 transition-colors" aria-label="Play pronunciation">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="currentColor" viewBox="0 0 24 24">
-                                <path d="M8 5v14l11-7z" />
-                            </svg>
+                    <div class="actions">
+                        <button onclick="speakCity('${city.id}')" class="btn-play">
+                            <svg width="24" height="24" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
                         </button>
-                        <button onclick="window.toggleFavorite('${city.id}')" class="p-3 rounded-full transition-colors ${isFav ? 'text-yellow-400' : 'text-gray-300'}" aria-label="Toggle favorite">
-                            ${isFav 
-                                ? `<svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" viewBox="0 0 20 20" fill="currentColor">
-                                     <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                                   </svg>`
-                                : `<svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                     <path stroke-linecap="round" stroke-linejoin="round" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
-                                   </svg>`
-                            }
+                        <button onclick="toggleFavorite('${city.id}')" class="btn-fav ${isFav ? 'active' : ''}">
+                            <svg width="28" height="28" fill="currentColor" viewBox="0 0 20 20">
+                                <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                            </svg>
                         </button>
                     </div>
                 `;
-                listContainer.appendChild(li);
+                list.appendChild(li);
             });
         }
 
-        // --- Utility ---
-        function showToast(message) {
-            const toast = document.getElementById('toast');
-            toast.textContent = message;
-            toast.classList.remove('opacity-0');
+        // --- Text To Speech Logic ---
+        function speakCity(cityId) {
+            if (!('speechSynthesis' in window)) {
+                showToast("TTS not supported.");
+                return;
+            }
+
+            const city = cities.find(c => c.id === cityId);
+            const useCyrillic = document.getElementById('voice-toggle').checked;
             
-            setTimeout(() => {
-                toast.classList.add('opacity-0');
-            }, 3000);
+            window.speechSynthesis.cancel();
+            
+            const voices = window.speechSynthesis.getVoices();
+            let utterance;
+
+            if (useCyrillic) {
+                utterance = new SpeechSynthesisUtterance(city.cyrillic);
+                utterance.lang = 'uk-UA';
+                const ukVoice = voices.find(v => v.lang.includes('uk'));
+                if (ukVoice) {
+                    utterance.voice = ukVoice;
+                } else {
+                    showToast("⚠️ Native Ukrainian voice not found.");
+                }
+            } else {
+                // If toggled OFF, pass the engineered phonetic string to the English TTS
+                utterance = new SpeechSynthesisUtterance(city.ttsPhonetic);
+                utterance.lang = 'en-US';
+                const enVoice = voices.find(v => v.lang.includes('en'));
+                if (enVoice) utterance.voice = enVoice;
+            }
+
+            utterance.rate = 0.85;
+            window.speechSynthesis.speak(utterance);
+        }
+
+        // --- Utils ---
+        function switchView(view) {
+            document.getElementById('map-container').style.display = view === 'map' ? 'flex' : 'none';
+            document.getElementById('list-container').style.display = view === 'list' ? 'block' : 'none';
+            
+            document.getElementById('nav-map').classList.toggle('active', view === 'map');
+            document.getElementById('nav-list').classList.toggle('active', view === 'list');
+        }
+
+        function toggleFavorite(cityId) {
+            favorites.has(cityId) ? favorites.delete(cityId) : favorites.add(cityId);
+            localStorage.setItem('ua-cities-favs', JSON.stringify([...favorites]));
+            renderList();
+        }
+
+        function loadFavorites() {
+            try {
+                const stored = localStorage.getItem('ua-cities-favs');
+                if (stored) favorites = new Set(JSON.parse(stored));
+            } catch (e) {}
+        }
+
+        function showToast(msg) {
+            const toast = document.getElementById('toast');
+            toast.innerText = msg;
+            toast.classList.add('show-toast');
+            setTimeout(() => toast.classList.remove('show-toast'), 3000);
+        }
+        
+        // Force background voice load
+        if ('speechSynthesis' in window) {
+            window.speechSynthesis.onvoiceschanged = () => window.speechSynthesis.getVoices();
         }
     </script>
 </body>
