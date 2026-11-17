@@ -234,11 +234,15 @@
             // Cancel any currently playing speech
             window.speechSynthesis.cancel();
 
+            // We are explicitly passing the Cyrillic text here
             const utterance = new SpeechSynthesisUtterance(cyrillicText);
             utterance.lang = 'uk-UA'; 
             
             if (ukVoice) {
                 utterance.voice = ukVoice;
+            } else {
+                // Warn the user if a native Ukrainian voice isn't installed
+                showToast("⚠️ Ukrainian voice not found on device! Using fallback.");
             }
 
             utterance.rate = 0.85; // Slightly slower for clearer pronunciation
