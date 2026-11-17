@@ -314,23 +314,41 @@
             }).addTo(map);
 
             cities.forEach(city => {
-                const marker = L.marker([city.lat, city.lng]).addTo(map);
+                // Use circleMarker instead of standard tear-drop marker
+                const marker = L.circleMarker([city.lat, city.lng], {
+                    radius: 10,
+                    fillColor: "#ffd200", // Ukrainian Yellow
+                    color: "#0057B7",     // Ukrainian Blue
+                    weight: 3,
+                    opacity: 1,
+                    fillOpacity: 0.9
+                }).addTo(map);
                 
-                // HTML for the Leaflet Popup
+                // HTML for the Leaflet Popup (Simplified since button is removed)
                 const popupContent = `
-                    <div class="text-center min-w-[150px]">
+                    <div class="text-center min-w-[120px] pointer-events-none">
                         <h3 class="font-bold text-lg text-gray-900 mb-0">${city.name}</h3>
                         <p class="text-sm text-gray-500 italic mb-1">${city.phonetic}</p>
-                        <p class="text-md text-[#0057B7] font-semibold mb-3">${city.cyrillic}</p>
-                        <button onclick="window.speakCity('${city.cyrillic}')" class="w-full bg-[#0057B7] text-white py-2 px-4 rounded-lg shadow-sm flex items-center justify-center gap-2 active:bg-blue-800 transition-colors">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd" />
-                            </svg>
-                            Listen
-                        </button>
+                        <p class="text-md text-[#0057B7] font-semibold">${city.cyrillic}</p>
                     </div>
                 `;
-                marker.bindPopup(popupContent);
+                
+                // We use { closeButton: false } to make it look cleaner on hover
+                marker.bindPopup(popupContent, { closeButton: false, offset: L.point(0, -5) });
+
+                // Event Listeners for Hover and Click
+                marker.on('mouseover', function (e) {
+                    this.openPopup();
+                });
+                
+                marker.on('mouseout', function (e) {
+                    this.closePopup();
+                });
+
+                marker.on('click', function (e) {
+                    // Speak the Cyrillic text to enforce native pronunciation rules
+                    window.speakCity(city.cyrillic);
+                });
             });
         }
 
