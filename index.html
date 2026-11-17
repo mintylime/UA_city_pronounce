@@ -138,13 +138,11 @@
         let map;
         let favorites = new Set();
         let currentView = 'map';
-        let ukVoice = null;
 
         // --- Initialization ---
         document.addEventListener('DOMContentLoaded', () => {
             initPWA();
             loadFavorites();
-            loadVoices();
             initMap();
             renderList();
         });
@@ -214,15 +212,11 @@
         }
 
         // --- TTS Functionality ---
-        function loadVoices() {
-            const voices = window.speechSynthesis.getVoices();
-            // Try to find a native Ukrainian voice to assign
-            ukVoice = voices.find(v => v.lang === 'uk-UA' || v.lang.startsWith('uk'));
-        }
-        
-        // Browsers load voices asynchronously, so we listen for when they are ready
+        // Browsers load voices asynchronously, so we listen for when they are ready to force a load
         if ('speechSynthesis' in window) {
-            window.speechSynthesis.onvoiceschanged = loadVoices;
+            window.speechSynthesis.onvoiceschanged = () => {
+                window.speechSynthesis.getVoices(); 
+            };
         }
 
         window.speakCity = function(cyrillicText) {
@@ -238,11 +232,17 @@
             const utterance = new SpeechSynthesisUtterance(cyrillicText);
             utterance.lang = 'uk-UA'; 
             
+            // 1. Get all available browser voices dynamically at play-time
+            const voices = window.speechSynthesis.getVoices();
+            
+            // 2. Find the specific Ukrainian voice (handles macOS/iOS strictness)
+            const ukVoice = voices.find(voice => voice.lang === 'uk-UA' || voice.lang.includes('uk-'));
+            
+            // 3. Force the utterance to use this specific voice object
             if (ukVoice) {
                 utterance.voice = ukVoice;
             } else {
-                // Warn the user if a native Ukrainian voice isn't installed
-                showToast("⚠️ Ukrainian voice not found on device! Using fallback.");
+                showToast("⚠️ Ukrainian voice not found in browser! Using fallback.");
             }
 
             utterance.rate = 0.85; // Slightly slower for clearer pronunciation
